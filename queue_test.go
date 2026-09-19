@@ -54,20 +54,22 @@ func TestLimitedBroadcastLess(t *testing.T) {
 
 			require.True(t, a.Less(b))
 
-			tree := btree.New(32)
+			tree := btree.NewG(32, (*limitedBroadcast).Less)
 
-			tree.ReplaceOrInsert(b)
-			tree.ReplaceOrInsert(a)
+			_, _ = tree.ReplaceOrInsert(b)
+			_, _ = tree.ReplaceOrInsert(a)
 
-			min := tree.Min().(*limitedBroadcast)
-			require.Equal(t, a.transmits, min.transmits)
-			require.Equal(t, a.msgLen, min.msgLen)
-			require.Equal(t, a.id, min.id)
+			minItem, ok := tree.Min()
+			require.True(t, ok)
+			require.Equal(t, a.transmits, minItem.transmits)
+			require.Equal(t, a.msgLen, minItem.msgLen)
+			require.Equal(t, a.id, minItem.id)
 
-			max := tree.Max().(*limitedBroadcast)
-			require.Equal(t, b.transmits, max.transmits)
-			require.Equal(t, b.msgLen, max.msgLen)
-			require.Equal(t, b.id, max.id)
+			maxItem, ok := tree.Max()
+			require.True(t, ok)
+			require.Equal(t, b.transmits, maxItem.transmits)
+			require.Equal(t, b.msgLen, maxItem.msgLen)
+			require.Equal(t, b.id, maxItem.id)
 		})
 	}
 }
