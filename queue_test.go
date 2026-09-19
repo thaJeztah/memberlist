@@ -4,6 +4,7 @@
 package memberlist
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/btree"
@@ -241,5 +242,61 @@ func TestTransmitLimited_ordering(t *testing.T) {
 	}
 	if dump[4].transmits != 0 {
 		t.Fatalf("bad val %v, %d", dump[4].b.(*memberlistBroadcast).node, dump[4].transmits)
+	}
+}
+
+func BenchmarkTransmitLimitedQueueTree(b *testing.B) {
+	const size = 1024
+
+	var q TransmitLimitedQueue
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.lazyInit()
+
+	items := make([]*limitedBroadcast, size)
+	for i := range items {
+		cur := &limitedBroadcast{
+			transmits: i % 4,
+			msgLen:    int64(64 + i%1024),
+			id:        int64(i + 1),
+		}
+		items[i] = cur
+		q.addItem(cur)
+	}
+
+	b.ReportAllocs()
+
+	i := 0
+	for b.Loop() {
+		cur := items[i]
+		i++
+		if i == len(items) {
+			i = 0
+		}
+
+		q.deleteItem(cur)
+
+		// Give the reinserted item a different position in the tree.
+		cur.id += size
+
+		q.addItem(cur)
+	}
+}
+
+func BenchmarkTransmitLimitedQueueWalk(b *testing.B) {
+	const size = 1024
+
+	var q TransmitLimitedQueue
+	for i := range size {
+		q.queueBroadcast(&memberlistBroadcast{node: fmt.Sprintf("node-%d", i)}, i%4)
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		q.mu.Lock()
+		q.walkReadOnlyLocked(false, func(*limitedBroadcast) bool { return true })
+		q.mu.Unlock()
 	}
 }
